@@ -152,12 +152,17 @@
     .hero-main::after {
       content: "⚽";
       position: absolute;
+      pointer-events: none;
+      z-index: 0;
       right: -20px;
       bottom: -65px;
       font-size: 250px;
       opacity: .055;
       transform: rotate(-18deg);
     }
+
+    /* Mantém o conteúdo e os botões acima dos elementos decorativos. */
+    .hero-main > * { position: relative; z-index: 1; }
 
     .eyebrow {
       display: inline-flex;
@@ -201,7 +206,26 @@
       flex-wrap: wrap;
       gap: 10px;
       margin-top: 24px;
+      position: relative;
+      z-index: 5;
     }
+
+    /* Área de toque confiável em telas sensíveis ao toque. */
+    .hero-actions .btn {
+      position: relative;
+      z-index: 6;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(54,217,255,.22);
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    html { scroll-padding-top: 88px; }
+    section[id] { scroll-margin-top: 88px; }
 
     .btn-primary {
       background: linear-gradient(135deg, var(--blue), #3ed8ff);
@@ -585,8 +609,8 @@
         <div class="hero-actions">
           <a class="btn btn-primary" href="#jogadores">⚡ Entrar na lista</a>
           <a class="btn" href="#midia">▶ Ver destaques</a>
-          <a class="btn" href="https://drive.google.com/drive/folders/1BF9-v6GhAvsQEEFSLKv13zgKu5guTX3_?usp=sharing" target="_blank">🎬 Vídeos</a>
-          <a class="btn" href="https://drive.google.com/drive/folders/1rCG8jPpdhhgKQcWkDkhqI4nx2ZU2hanP?usp=sharing" target="_blank">📸 Imagens</a>
+          <a class="btn" href="https://drive.google.com/drive/folders/1BF9-v6GhAvsQEEFSLKv13zgKu5guTX3_?usp=sharing" target="_blank" rel="noopener noreferrer">🎬 Vídeos</a>
+          <a class="btn" href="https://drive.google.com/drive/folders/1rCG8jPpdhhgKQcWkDkhqI4nx2ZU2hanP?usp=sharing" target="_blank" rel="noopener noreferrer">📸 Imagens</a>
         </div>
       </div>
 
@@ -717,7 +741,7 @@
           <span class="tag">Pendências</span>
           <h3>Inadimplentes</h3>
           <div class="debt-list">
-            <p>Rodrigo (2 babas / $-20, limite excedido / Suspenso)</p>
+            <p>Rodrigo</p>
             <p></p>
           </div>
         </div>
@@ -865,6 +889,19 @@
   </footer>
 
   <script>
+    // Navegação dos botões da capa: rolagem confiável em celulares e desktops.
+    document.addEventListener("click", function (event) {
+      const link = event.target.closest('.hero-actions a[href^="#"]');
+      if (!link) return;
+      const destino = document.querySelector(link.getAttribute("href"));
+      if (!destino) return;
+      event.preventDefault();
+      destino.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (history && history.replaceState) {
+        history.replaceState(null, "", link.getAttribute("href"));
+      }
+    }, { passive: false });
+
     function verificar() {
       const p = document.getElementById("palavra").value.trim().toLowerCase();
       const resultado = document.getElementById("resultado");

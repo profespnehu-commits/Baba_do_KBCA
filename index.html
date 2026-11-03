@@ -658,11 +658,12 @@
       </div>
 
       <div class="card">
-        <div class="team-tool">
+        <form class="team-tool" id="form-inscricao">
           <input type="text" id="nome" placeholder="Digite seu nome..." autocomplete="name"
-                 onkeypress="if(event.key==='Enter'){adicionar()}">
-          <button class="btn btn-primary" onclick="adicionar()">+ Confirmar</button>
-        </div>
+                 enterkeyhint="done" maxlength="80" required>
+          <button class="btn btn-primary" id="btn-confirmar" type="submit">+ Confirmar</button>
+        </form>
+        <p id="status-inscricao" class="muted" role="status" aria-live="polite"></p>
         <ol id="lista" class="players"></ol>
       </div>
     </section>
@@ -886,37 +887,25 @@
     } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
-    apiKey: "AIzaSyAO7XYw-T-DB695phUjTqQE6KT-Gz8ZwQU",
-    authDomain: "banco-de-dados-do-site-7a058.firebaseapp.com",
-    projectId: "banco-de-dados-do-site-7a058",
-    storageBucket: "banco-de-dados-do-site-7a058.firebasestorage.app",
-    messagingSenderId: "52701318665",
-    appId: "1:52701318665:web:b50401d8ce880c325972d8",
-    measurementId: "G-8Y2D89K75D"
-  };
+      apiKey: "AIzaSyAO7XYw-T-DB695phUjTqQE6KT-Gz8ZwQU",
+      authDomain: "banco-de-dados-do-site-7a058.firebaseapp.com",
+      projectId: "banco-de-dados-do-site-7a058",
+      storageBucket: "banco-de-dados-do-site-7a058.firebasestorage.app",
+      messagingSenderId: "52701318665",
+      appId: "1:52701318665:web:b50401d8ce880c325972d8",
+      measurementId: "G-8Y2D89K75D"
+    };
 
-    // IMPORTANTE:
-    // A apiKey do Firebase Web pode aparecer no código do navegador.
-    // A proteção deve ser feita com API restrictions, Firebase Security Rules e App Check.
-    // Não use esta apiKey como senha ou como mecanismo de autorização.
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const inscritosRef = collection(db, "inscritos");
-    const q = query(inscritosRef, orderBy("timestamp"));
+    const form = document.getElementById("form-inscricao");
+    const input = document.getElementById("nome");
+    const botao = document.getElementById("btn-confirmar");
+    const lista = document.getElementById("lista");
+    const status = document.getElementById("status-inscricao");
 
-    onSnapshot(q, (snapshot) => {
-      const lista = document.getElementById("lista");
-      lista.innerHTML = "";
-
-      snapshot.forEach((docItem) => {
-        const li = document.createElement("li");
-        li.innerHTML = `
-          <span>${escapeHtml(docItem.data().nome)}</span>
-          <button onclick="remover('${docItem.id}')">Excluir</button>
-        `;
-        lista.appendChild(li);
-      });
-    });
+    function mostrarStatus(mensagem, erro = false) {
+      status.textContent = mensagem;
+      status.style.color = erro ? "#ff9ba6" : "#38e89a";
+    }
 
     function escapeHtml(value) {
       return String(value)
@@ -927,41 +916,94 @@
         .replaceAll("'", "&#039;");
     }
 
-    window.adicionar = async function () {
-      const input = document.getElementById("nome");
-      const nome = input.value.trim();
+    let db;
+    let inscritosRef;
 
+    // O formulário é tratado por submit: funciona por toque e pela tecla Enter.
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const nome = input.value.trim();
       if (!nome) {
-        alert("Digite um nome válido!");
+        mostrarStatus("Digite seu nome antes de confirmar.", true);
+        input.focus();
         return;
       }
+
+      if (!inscritosRef) {
+        mostrarStatus("A lista ainda está carregando. Tente novamente em instantes.", true);
+        return;
+      }
+
+      botao.disabled = true;
+      botao.textContent = "Registrando...";
+      mostrarStatus("Enviando sua confirmação...");
 
       try {
         await addDoc(inscritosRef, {
           nome,
           timestamp: Date.now()
         });
-        input.value = "";
-      } catch (error) {
-        console.error(error);
-        alert("Não foi possível registrar o nome. Verifique sua conexão e as regras do Firebase.");
-      }
-    };
 
+        input.value = "";
+        mostrarStatus("Presença confirmada com sucesso! ⚽");
+        input.focus();
+      } catch (error) {
+        console.error("Erro ao registrar participante:", error);
+        mostrarStatus("Não foi possível registrar. Verifique a internet e tente novamente.", true);
+      } finally {
+        botao.disabled = false;
+        botao.textContent = "+ Confirmar";
+      }
+    });
+
+    // A exclusão continua disponível globalmente para os botões da lista.
     window.remover = async function (id) {
       const senha = prompt("Digite a senha do administrador:");
 
       if (senha === "admin123") {
         try {
           await deleteDoc(doc(db, "inscritos", id));
+          mostrarStatus("Participante removido.");
         } catch (error) {
-          console.error(error);
-          alert("Não foi possível excluir o participante.");
+          console.error("Erro ao excluir participante:", error);
+          mostrarStatus("Não foi possível excluir o participante.", true);
         }
       } else if (senha !== null) {
         alert("Senha incorreta!");
       }
     };
+
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      inscritosRef = collection(db, "inscritos");
+      const q = query(inscritosRef, orderBy("timestamp"));
+
+      onSnapshot(q, (snapshot) => {
+        lista.replaceChildren();
+
+        snapshot.forEach((docItem) => {
+          const li = document.createElement("li");
+          const nomeSpan = document.createElement("span");
+          nomeSpan.textContent = docItem.data().nome || "Participante";
+
+          const excluir = document.createElement("button");
+          excluir.type = "button";
+          excluir.textContent = "Excluir";
+          excluir.addEventListener("click", () => window.remover(docItem.id));
+
+          li.append(nomeSpan, excluir);
+          lista.appendChild(li);
+        });
+      }, (error) => {
+        console.error("Erro ao carregar lista:", error);
+        mostrarStatus("Não foi possível carregar a lista. Verifique a conexão.", true);
+      });
+    } catch (error) {
+      console.error("Erro ao inicializar Firebase:", error);
+      mostrarStatus("Não foi possível conectar ao sistema de inscrições.", true);
+    }
   </script>
 </body>
 </html>
